@@ -3,60 +3,46 @@ import pickle
 from threading import Thread
 
 
-def accept_incoming_connections():
+def accept_incoming_connections(server: socket.socket):
     while True:
-        client, address = SERVER.accept()
-        print(f'new client: {address}')
-        msg = 'Welcome to the chat please enter your name'
-        client.send(pickle.dumps(msg))
-        addresses[client] = address
-        Thread(target=handle_client, args=(client,)).start()
+        conn, address = server.accept()
+        print(f'connected to {address}')
+        addresses[conn] = address
+        Thread(target=handle_client, args=(conn,)).start()
 
 
 def handle_client(client: socket.socket):
-    name = client.recv(BUFSIZ)
-    name = pickle.loads(name)
-    clients[client] = name
-    # msg = f'Welcome {name} if you want to quit, type {{quit}} to exit'
-    # client.send(pickle.dumps(msg))
-    msg = f'{name} has joined the chat'
-    broadcast(msg)
-    while True:
-        msg = client.recv(BUFSIZ)
-        msg = pickle.loads(msg)
-        if msg == 'quit':
-            msg = f'{name} has left the chat'
-            broadcast(msg)
-            del clients[client]
-            client.close()
-            break
-        else:
-            broadcast(msg, name)
+    msg = 'Welcome to the chat group please enter you name first'
+    data = pickle.dumps(msg)
+    client.send(data)
+    
 
 
-def broadcast(msg: str, name=''):
-    for client in clients:
-        data = pickle.dumps((name, msg))
-        client.send(data)
+def broadcast(msg, name):
+    data = pickle.dumps((msg, name))
+    for addr in addresses:
+        addr.send(data)
 
 
 HOST = ''
-PORT = 8005
+PORT = 8200
 ADDR = (HOST, PORT)
 BUFSIZ = 1024
 MAX_CLIENTS = 5
-
 clients = {}
 addresses = {}
 
-SERVER = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-SERVER.bind(ADDR)
 
-if __name__ == '__main__':
+def main():
+    SERVER = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    SERVER.bind(ADDR)
     SERVER.listen(MAX_CLIENTS)
     print('Waiting for connections...')
-    ACCEPT_THREAD = Thread(target=accept_incoming_connections)
+    ACCEPT_THREAD = Thread(target=accept_incoming_connections, args=(SERVER,))
     ACCEPT_THREAD.start()
     ACCEPT_THREAD.join()
     SERVER.close()
+    
 
+if __name__ == '__main__':
+    main()
