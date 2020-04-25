@@ -3,25 +3,51 @@ import pickle
 from threading import Thread
 
 
+def send(skt: socket.socket, msg):
+    data = pickle.dumps(msg)
+    skt.send(data)
+
+
+def recv(skt: socket.socket):
+    data = skt.recv(BUFSIZ)
+    return pickle.loads(data)
+
+
 def accept_incoming_connections(server: socket.socket):
     while True:
-        conn, address = server.accept()
+        client, address = server.accept()
         print(f'connected to {address}')
-        addresses[conn] = address
-        Thread(target=handle_client, args=(conn,)).start()
+        addresses[client] = address
+        Thread(target=handle_client, args=(client,)).start()
 
 
 def handle_client(client: socket.socket):
     msg = 'Welcome to the chat group please enter you name first'
+    data = send(client, msg)
+    name = recv(client)
+    clients[client] = name
+    msg = f'Welcome {name} type message and press button to send it you can exit by sending quit'
+    send(client, msg)
+    msg = f'{name} joined the chat'
+    broadcast(msg)
+    while True:
+        msg = recv(client)
+        if msg != 'quit':
+            broadcast(msg, name)
+        else:
+            msg = 'left the chat'
+            broadcast(msg, name)
+            del clients[client]
+            client.close()
+            break
+
+
+def broadcast(msg, name=''):
+    if name:
+        msg = f'{name}: {msg}'
     data = pickle.dumps(msg)
-    client.send(data)
-    
-
-
-def broadcast(msg, name):
-    data = pickle.dumps((msg, name))
-    for addr in addresses:
-        addr.send(data)
+    for client in clients:
+        client.send(data)
 
 
 HOST = ''
